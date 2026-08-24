@@ -1,0 +1,103 @@
+name: Container
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/container.yml
+      - alpine.dockerfile
+      - debian.dockerfile
+      - fedora.dockerfile
+      - ubuntu.dockerfile
+      - docker-entrypoint.sh
+      - Makefile
+      - SHA512SUMS.txt
+      - xml-edit.sh
+      - icecast.xml
+
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/container.yml
+      - alpine.dockerfile
+      - debian.dockerfile
+      - fedora.dockerfile
+      - ubuntu.dockerfile
+      - docker-entrypoint.sh
+      - Makefile
+      - SHA512SUMS.txt
+      - xml-edit.sh
+      - icecast.xml
+      
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - 2.4.4
+          - 2.5.0
+        variant:
+          - ubuntu
+          - fedora
+          - debian
+          - alpine
+
+    env:
+      DEFAULT_VARIANT: debian
+      DEFAULT_VERSION: 2.5.0
+      LIBIGLOO_VERSION: 0.9.5
+
+    if: ${{ github.repository_owner == 'libretime' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          lfs: true
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/login-action@v4
+        if: github.event_name == 'push'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - run: make checksum
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/icecast
+            ${{ github.repository_owner }}/icecast
+          tags: |
+            type=raw,value=${{ matrix.version }}-${{ matrix.variant }}
+            type=raw,value=${{ matrix.version }},enable=${{ matrix.variant == env.DEFAULT_VARIANT }}
+
+            type=raw,value=${{ matrix.variant }},enable=${{ matrix.version == env.DEFAULT_VERSION }}
+            type=raw,value=latest,enable=${{ matrix.variant == env.DEFAULT_VARIANT && matrix.version == env.DEFAULT_VERSION }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          pull: true
+          file: ${{ matrix.variant }}.dockerfile
+          build-args: |
+            VERSION=${{ matrix.version }}
+            LIBIGLOO_VERSION=${{ env.LIBIGLOO_VERSION }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}

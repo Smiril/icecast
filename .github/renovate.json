@@ -1,0 +1,21 @@
+{
+  "extends": ["config:base", ":enablePreCommit", ":preserveSemverRanges"],
+  "labels": ["dependencies"],
+  "dockerfile": {
+    "fileMatch": ["^.*\\.dockerfile$"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["ci"]
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "pinDigests": true
+    },
+    {
+      "matchUpdateTypes": ["patch", "digest"],
+      "automerge": true
+    }
+  ]
+}

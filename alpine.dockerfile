@@ -1,0 +1,100 @@
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40 AS builder
+ARG VERSION
+ARG LIBIGLOO_VERSION
+
+RUN apk --no-cache add \
+    autoconf \
+    automake \
+    build-base \
+    git \
+    libtool \
+    pkgconf \
+    rhash-dev \
+    # Icecast
+    curl-dev \
+    libogg-dev \
+    libtheora-dev \
+    libvorbis-dev \
+    libxml2-dev \
+    libxslt-dev \
+    openssl-dev \
+    speex-dev
+
+WORKDIR /build
+RUN git clone --depth 1 --branch v$LIBIGLOO_VERSION https://gitlab.xiph.org/xiph/icecast-libigloo.git libigloo
+WORKDIR /build/libigloo
+RUN autoreconf -fi && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install && \
+    make install DESTDIR=/build/output
+
+WORKDIR /build
+ADD icecast-$VERSION.tar.gz .
+RUN if test ! -d icecast-$VERSION; then cd /build && tar -xvzf icecast-$VERSION.tar.gz ; fi
+RUN if [ $VERSION == '2.5.0' ]; then /build/icecast-$VERSION/configure  --prefix=/usr  --sysconfdir=/etc  --localstatedir=/var ; fi
+RUN make
+RUN make install DESTDIR=/build/output
+
+FROM alpine:3.23@sha256:fd791d74b68913cbb027c6546007b3f0d3bc45125f797758156952bc2d6daf40
+
+RUN apk --no-cache add \
+    libcurl \
+    libogg \
+    rhash-libs \
+    libtheora \
+    libvorbis \
+    libxml2 \
+    libxslt \
+    openssl \
+    speex
+
+ENV USER=icecast
+
+RUN adduser --disabled-password --gecos '' --no-create-home $USER
+
+FROM mcr.microsoft.com/dotnet/core/aspnet:3.1 AS runtime
+SHELL ["/bin/bash", "-c"]
+RUN echo "$(openssl version)"
+RUN openssl req \
+-x509 \
+-out /etc/cert.pem \
+-keyout /etc/key.pem \
+-newkey rsa:2048 \
+-nodes \
+-sha256 \
+-subj "/CN=localhost" \
+-extensions EXT \
+-config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
+
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+COPY icecast.xml /etc/icecast.xml
+COPY xml-edit.sh /usr/local/bin/xml-edit
+COPY secure-alp.sh /usr/local/bin/secure.sh
+COPY auto.sh /etc/profile.d/auto.sh
+RUN chmod +x \
+    /usr/local/bin/docker-entrypoint \
+    /usr/local/bin/xml-edit \
+    /etc/profile.d/auto.sh \
+    /usr/local/bin/secure.sh
+
+RUN /usr/local/bin/secure.sh
+
+RUN chmod 0650 \
+    /etc/cert.pem \
+    /etc/key.pem
+RUN chown $USER:$USER \
+     /etc/cert.pem \
+     /etc/key.pem
+
+COPY --from=builder /build/output /usr/local/bin
+RUN xml-edit errorlog - /etc/icecast.xml
+
+RUN mkdir -p /var/log/icecast && \
+    chown $USER:$USER /etc/icecast.xml /var/log/icecast
+
+EXPOSE 8000
+ENTRYPOINT ["docker-entrypoint"]
+USER $USER
+CMD ["icecast", "-c", "/etc/icecast.xml"]
