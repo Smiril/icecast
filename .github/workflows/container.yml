@@ -14,6 +14,10 @@ on:
       - SHA512SUMS.txt
       - xml-edit.sh
       - icecast.xml
+      - secure-alp.sh
+      - secure.debubu.sh
+      - secure-fed.sh
+      - auto.sh
 
   pull_request:
     branches: [main]
@@ -28,7 +32,11 @@ on:
       - SHA512SUMS.txt
       - xml-edit.sh
       - icecast.xml
-      
+      - secure-alp.sh
+      - secure.debubu.sh
+      - secure-fed.sh
+      - auto.sh
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
@@ -39,8 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 2.4.4
-          - 2.5.0
+        - 2.5.0
         variant:
           - ubuntu
           - fedora
@@ -48,11 +55,11 @@ jobs:
           - alpine
 
     env:
-      DEFAULT_VARIANT: debian
+      DEFAULT_VARIANT: alpine
       DEFAULT_VERSION: 2.5.0
       LIBIGLOO_VERSION: 0.9.5
 
-    if: ${{ github.repository_owner == 'libretime' }}
+    if: ${{ github.repository_owner == 'Smiril' }}
     steps:
       - uses: actions/checkout@v7
         with:
