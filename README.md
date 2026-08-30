@@ -1,4 +1,4 @@
-# [icecast](https://github.com/Smiril/icecast)  <a href="https://github.com/Smiril/icecast/actions/workflows/docker-publish.yml"><img src="https://github.com/Smiril/icecast/actions/workflows/docker-publish.yml/badge.svg"></a>
+# [icecast](https://github.com/Smiril/icecast)  
 <p align="center">
   <a href="//github.com/Smiril/icecast"><img src="https://img.shields.io/github/repo-size/Smiril/icecast"></a>
   <a href="//github.com/Smiril/icecast/commits"><img src="https://img.shields.io/github/last-commit/Smiril/icecast"></a>
